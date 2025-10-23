@@ -105,14 +105,32 @@ The daemon (`bin/daemon.dart`) accepts **4 arguments**:
 2. Logs startup info and received paths
 3. Monitors parent process until it exits (1 second intervals)
 4. Handles SIGTERM/SIGINT for graceful shutdown
-5. **Backs up current app** to `/Applications/test_dart_cli.app.backup`:
-   - Removes existing backup if present
-   - Recursively copies entire `.app` bundle
+5. **Backs up current app** using rename (fast, atomic):
+   - Removes existing backup if present at `~/.test_dart_cli_backup/test_dart_cli.app.backup`
+   - Renames entire `.app` bundle from `/Applications` to backup location
    - Verifies backup exists
    - If backup fails: relaunches app and exits with error
-6. Performs update operations (TODO: zip extraction, file replacement)
-7. Launches the Flutter app using `open -a test_dart_cli`
-8. Exits gracefully
+6. **Extracts update package**:
+   - Creates temporary directory with `Directory.systemTemp.createTemp()`
+   - Extracts zip using `archive` package
+   - **Restores Unix file permissions** from zip metadata (critical for executables)
+   - Verifies `test_dart_cli.app` exists in extracted files
+   - If extraction fails: rolls back from backup, relaunches app, exits
+7. **Installs new app** using rename:
+   - Renames extracted app from temp directory to `/Applications/test_dart_cli.app`
+   - Verifies installation
+   - If installation fails: cleans up temp, rolls back from backup, relaunches app, exits
+8. **Cleanup on success**:
+   - Deletes temporary extraction directory
+   - Deletes backup (old app version)
+9. Launches the Flutter app using `open -a test_dart_cli`
+10. Exits gracefully
+
+**Key Implementation Details**:
+- Uses `rename()` instead of recursive copy for speed and atomicity
+- Preserves Unix file permissions during zip extraction (fixes "can't be opened" errors)
+- Comprehensive rollback mechanism on any failure
+- All errors logged to `daemon_log.txt`
 
 ## Flutter App UI
 
@@ -159,10 +177,12 @@ The `DaemonManager` provides:
    - After 1 second, app closes
    - Check `logs/daemon_log.txt` - should see:
      - Parent process monitoring
-     - Backup creation logs
-     - Update operations (when implemented)
+     - Backup creation logs (rename to `~/.test_dart_cli_backup/`)
+     - Zip extraction with permission restoration
+     - New app installation
+     - Temp cleanup and backup deletion
      - App relaunch
-   - Verify backup created at `/Applications/test_dart_cli.app.backup`
+   - Verify backup created at `~/.test_dart_cli_backup/test_dart_cli.app.backup` (deleted after successful update)
    - App automatically relaunches after daemon completes
 
 6. **Verify logs**:
