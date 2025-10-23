@@ -15,7 +15,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final DaemonManager _manager = DaemonManager();
 
   // 하드코딩된 버전 정보
-  static const String appVersion = '1.0.0';
+  static const String appVersion = '2.0.2';
   static const String buildNumber = '1';
 
   String _statusMessage = '업데이트 대기 중...';
@@ -87,10 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          '현재 버전:',
-                          style: TextStyle(fontSize: 16),
-                        ),
+                        const Text('현재 버전:', style: TextStyle(fontSize: 16)),
                         Text(
                           'v$appVersion',
                           style: const TextStyle(
@@ -105,10 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          '빌드 번호:',
-                          style: TextStyle(fontSize: 16),
-                        ),
+                        const Text('빌드 번호:', style: TextStyle(fontSize: 16)),
                         Text(
                           buildNumber,
                           style: const TextStyle(
@@ -151,10 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                           SizedBox(width: 16),
-                          Text(
-                            '업데이트 진행 중...',
-                            style: TextStyle(fontSize: 18),
-                          ),
+                          Text('업데이트 진행 중...', style: TextStyle(fontSize: 18)),
                         ],
                       )
                     : const Row(
@@ -193,10 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const Divider(height: 24),
                     Text(
                       _statusMessage,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        height: 1.5,
-                      ),
+                      style: const TextStyle(fontSize: 15, height: 1.5),
                     ),
                   ],
                 ),
