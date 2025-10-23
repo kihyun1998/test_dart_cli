@@ -2,15 +2,16 @@ import 'dart:async';
 import 'dart:io';
 
 void main(List<String> args) async {
-  // 인자: [로그 파일 경로, Flutter 앱 경로, zip 파일 경로]
-  if (args.length < 3) {
-    stderr.writeln('Usage: daemon <log_file_path> <flutter_app_path> <zip_file_path>');
+  // 인자: [부모 PID, 로그 파일 경로, Flutter 앱 경로, zip 파일 경로]
+  if (args.length < 4) {
+    stderr.writeln('Usage: daemon <parent_pid> <log_file_path> <flutter_app_path> <zip_file_path>');
     exit(1);
   }
 
-  final logFilePath = args[0];
-  final flutterAppPath = args[1];
-  final zipFilePath = args[2];
+  final parentPid = int.parse(args[0]);
+  final logFilePath = args[1];
+  final flutterAppPath = args[2];
+  final zipFilePath = args[3];
 
   final logFile = File(logFilePath);
 
@@ -24,8 +25,19 @@ void main(List<String> args) async {
 
   // 시작 로그 기록
   await _writeLog(logFile, 'Daemon started (PID: $currentPid)');
+  await _writeLog(logFile, 'Parent PID: $parentPid');
   await _writeLog(logFile, 'Flutter app path: $flutterAppPath');
   await _writeLog(logFile, 'Zip file path: $zipFilePath');
+
+  // 부모 프로세스 모니터링 시작
+  await _writeLog(logFile, 'Starting parent process monitoring...');
+  int checkCount = 0;
+  while (await _isProcessAlive(parentPid)) {
+    checkCount++;
+    await _writeLog(logFile, 'Parent process check #$checkCount: still alive');
+    await Future.delayed(Duration(seconds: 1));
+  }
+  await _writeLog(logFile, 'Parent process exit detected!');
 
   // SIGTERM/SIGINT 핸들러 설정
   ProcessSignal.sigterm.watch().listen((signal) async {
@@ -38,11 +50,9 @@ void main(List<String> args) async {
     exit(0);
   });
 
-  // 10개의 로그 출력
-  for (int i = 1; i <= 10; i++) {
-    await _writeLog(logFile, 'Log entry $i/10');
-    await Future.delayed(Duration(milliseconds: 500));
-  }
+  // 1초 대기
+  await _writeLog(logFile, 'Waiting 1 second before relaunching app...');
+  await Future.delayed(Duration(seconds: 1));
 
   // Flutter 앱 실행
   await _writeLog(logFile, 'Launching Flutter app: $flutterAppPath');
@@ -73,5 +83,14 @@ Future<void> _writeLog(File logFile, String message) async {
     await logFile.writeAsString(logMessage, mode: FileMode.append, flush: true);
   } catch (e) {
     stderr.writeln('Failed to write log: $e');
+  }
+}
+
+Future<bool> _isProcessAlive(int pid) async {
+  try {
+    final result = await Process.run('ps', ['-p', '$pid']);
+    return result.exitCode == 0;
+  } catch (e) {
+    return false;
   }
 }

@@ -77,10 +77,13 @@ class DaemonManager {
         logsDir.createSync(recursive: true);
       }
 
-      // detached 모드로 프로세스 시작 (로그 경로, Flutter 앱 경로, zip 파일 경로를 인자로 전달)
+      // 현재 프로세스 PID 가져오기
+      final currentPid = pid;
+
+      // detached 모드로 프로세스 시작 (부모 PID, 로그 경로, Flutter 앱 경로, zip 파일 경로를 인자로 전달)
       final process = await Process.start(
         binaryPath,
-        [logPath, flutterAppPath, zipFilePath], // 로그 파일 + Flutter 앱 경로 + zip 파일 경로 전달
+        ['$currentPid', logPath, flutterAppPath, zipFilePath], // 부모 PID + 로그 파일 + Flutter 앱 경로 + zip 파일 경로 전달
         mode: ProcessStartMode.detached,
         workingDirectory: projectRoot,
       );
