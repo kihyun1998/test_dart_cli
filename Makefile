@@ -1,4 +1,4 @@
-\.PHONY: all clean daemon flutter-build copy-daemon dmg install-appdmg
+\.PHONY: all clean daemon flutter-build copy-daemon dmg updater-zip install-appdmg
 
 # 앱 이름 및 경로
 APP_NAME = test_dart_cli
@@ -8,10 +8,12 @@ FLUTTER_BUILD_DIR = build/macos/Build/Products/Release
 APP_BUNDLE = $(FLUTTER_BUILD_DIR)/$(APP_NAME).app
 APP_MACOS_DIR = $(APP_BUNDLE)/Contents/MacOS
 DMG_OUTPUT = app_out/$(APP_NAME).dmg
+UPDATER_ZIP = app_out/$(APP_NAME)_updater.zip
 
 # 기본 타겟: 전체 빌드
-all: daemon flutter-build copy-daemon dmg
+all: daemon flutter-build copy-daemon dmg updater-zip
 	@echo "✅ 빌드 완료: $(DMG_OUTPUT)"
+	@echo "✅ 업데이터 ZIP 완료: $(UPDATER_ZIP)"
 
 # 1. Dart 데몬 바이너리 컴파일
 daemon:
@@ -39,6 +41,14 @@ dmg:
 	@rm -f $(DMG_OUTPUT)
 	appdmg installer/config.json $(DMG_OUTPUT)
 	@echo "✅ DMG 생성 완료: $(DMG_OUTPUT)"
+
+# 5. 업데이터용 ZIP 생성
+updater-zip:
+	@echo "📦 업데이터 ZIP 생성 중..."
+	@mkdir -p app_out
+	@rm -f $(UPDATER_ZIP)
+	cd $(FLUTTER_BUILD_DIR) && zip -r ../../../../../$(UPDATER_ZIP) $(APP_NAME).app
+	@echo "✅ 업데이터 ZIP 생성 완료: $(UPDATER_ZIP)"
 
 # appdmg 설치 (필요시)
 install-appdmg:
