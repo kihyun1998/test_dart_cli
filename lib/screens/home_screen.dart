@@ -38,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
     print(result.message);
     print('바이너리 경로: ${_manager.binaryPath}');
     print('로그 파일 경로: ${_manager.logPath}');
+    print('Flutter 앱 경로: ${_manager.flutterAppPath}');
     print('=========================');
 
     setState(() {
@@ -47,6 +48,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (result.success) {
       await _checkStatus();
+
+      // 1초 후 앱 종료
+      print('1초 후 앱이 종료됩니다...');
+      await Future.delayed(const Duration(seconds: 1));
+      print('앱 종료');
+      exit(0);
     }
   }
 

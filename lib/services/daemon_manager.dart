@@ -33,9 +33,13 @@ class DaemonManager {
   // 프로젝트 루트 경로 (하드코딩)
   static const String projectRoot = '/Users/kihyun/Documents/GitHub/test_dart_cli';
 
+  // Flutter 앱 번들 내 실행 파일 디렉토리
+  String get appBundleDir => Directory(Platform.resolvedExecutable).parent.path;
+
   String get binSource => '$projectRoot/bin/daemon.dart';
-  String get binaryPath => '$projectRoot/bin_output/daemon';
+  String get binaryPath => '$appBundleDir/daemon';  // 앱 번들 내부 경로
   String get logPath => '$projectRoot/logs/daemon_log.txt';
+  String get flutterAppPath => '$projectRoot/build/macos/Build/Products/Debug/test_dart_cli.app';
 
   /// 데몬 프로세스 실행
   Future<RunResult> runDaemon() async {
@@ -46,9 +50,23 @@ class DaemonManager {
         return RunResult(
           success: false,
           message: '❌ 바이너리 파일이 없습니다!\n\n'
-              '다음 명령어로 먼저 빌드하세요:\n'
-              'dart compile exe bin/daemon.dart -o bin_output/daemon\n\n'
-              '경로: $binaryPath',
+              '앱 번들 경로: $appBundleDir\n'
+              '바이너리 경로: $binaryPath\n\n'
+              '다음 명령어로 바이너리를 빌드하고 복사하세요:\n'
+              'dart compile exe bin/daemon.dart -o bin_output/daemon\n'
+              'cp bin_output/daemon "$appBundleDir/daemon"',
+        );
+      }
+
+      // Flutter 앱 존재 확인
+      final flutterApp = Directory(flutterAppPath);
+      if (!flutterApp.existsSync()) {
+        return RunResult(
+          success: false,
+          message: '❌ Flutter 앱이 빌드되지 않았습니다!\n\n'
+              '다음 명령어로 앱을 빌드하세요:\n'
+              'flutter build macos --debug\n\n'
+              '경로: $flutterAppPath',
         );
       }
 
@@ -58,10 +76,10 @@ class DaemonManager {
         logsDir.createSync(recursive: true);
       }
 
-      // detached 모드로 프로세스 시작 (로그 경로를 인자로 전달)
+      // detached 모드로 프로세스 시작 (로그 경로와 Flutter 앱 경로를 인자로 전달)
       final process = await Process.start(
         binaryPath,
-        [logPath], // 로그 파일 절대 경로 전달
+        [logPath, flutterAppPath], // 로그 파일 + Flutter 앱 경로 전달
         mode: ProcessStartMode.detached,
         workingDirectory: projectRoot,
       );
@@ -69,7 +87,7 @@ class DaemonManager {
       return RunResult(
         success: true,
         pid: process.pid,
-        message: '✅ 데몬 시작됨 (PID: ${process.pid})',
+        message: '✅ 데몬 시작됨 (PID: ${process.pid})\n1초 후 앱이 종료되고 데몬이 작업을 시작합니다.',
       );
     } catch (e) {
       return RunResult(success: false, message: '❌ 실행 오류: $e');
