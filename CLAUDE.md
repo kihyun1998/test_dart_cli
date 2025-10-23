@@ -10,12 +10,14 @@ This is a **macOS Zip Updater Test App** - a Flutter + Dart CLI experiment demon
 1. User clicks "Update" button in Flutter app
 2. Daemon process starts in background (detached)
 3. Flutter app immediately exits
-4. Daemon performs update simulation (10 log entries)
-5. Daemon relaunches the Flutter app
+4. Daemon waits for parent process to exit
+5. Daemon backs up current app to `.backup`
+6. Daemon performs update operations (zip extraction, file replacement)
+7. Daemon relaunches the Flutter app
 
 **Architecture**: Two separate processes
 - **Flutter macOS App** (`lib/`): Simple UI with version display and update button
-- **Dart CLI Daemon** (`bin/daemon.dart`): Independent background updater process
+- **Dart CLI Daemon** (`bin/daemon.dart`): Independent background updater process with backup/restore capability
 
 ## Critical Build Steps
 
@@ -46,7 +48,7 @@ The daemon survives Flutter app termination because `DaemonManager.runDaemon()` 
 ```dart
 Process.start(
   binaryPath,
-  [logPath, flutterAppPath, zipFilePath],  // 3 arguments
+  [parentPid, logPath, flutterAppPath, zipFilePath],  // 4 arguments
   mode: ProcessStartMode.detached,  // Key: parent death doesn't kill child
   workingDirectory: projectRoot,
 );
@@ -88,22 +90,29 @@ lib/screens/home_screen.dart             # Simple UI: version display + update b
 
 ## Daemon Behavior
 
-The daemon (`bin/daemon.dart`) accepts **3 arguments**:
+The daemon (`bin/daemon.dart`) accepts **4 arguments**:
 ```bash
-./daemon <log_file_path> <flutter_app_path> <zip_file_path>
+./daemon <parent_pid> <log_file_path> <flutter_app_path> <zip_file_path>
 ```
 
 **Update Flow**:
-1. Receives 3 arguments from Flutter app:
+1. Receives 4 arguments from Flutter app:
+   - Parent PID: Process ID of the Flutter app to monitor
    - Log file path: `/Users/kihyun/Documents/GitHub/test_dart_cli/logs/daemon_log.txt`
-   - Flutter app path: `/Users/kihyun/Documents/GitHub/test_dart_cli/build/macos/Build/Products/Debug/test_dart_cli.app`
+   - Flutter app path: `/Applications/test_dart_cli.app` (actual installed app location)
    - Zip file path: `/Users/kihyun/Documents/GitHub/test_dart_cli/app_out/test_dart_cli_updater.zip` (hardcoded)
 
 2. Logs startup info and received paths
-3. Handles SIGTERM/SIGINT for graceful shutdown
-4. Outputs 10 log entries simulating update progress (500ms intervals)
-5. Launches the Flutter app using `open -a test_dart_cli`
-6. Exits gracefully
+3. Monitors parent process until it exits (1 second intervals)
+4. Handles SIGTERM/SIGINT for graceful shutdown
+5. **Backs up current app** to `/Applications/test_dart_cli.app.backup`:
+   - Removes existing backup if present
+   - Recursively copies entire `.app` bundle
+   - Verifies backup exists
+   - If backup fails: relaunches app and exits with error
+6. Performs update operations (TODO: zip extraction, file replacement)
+7. Launches the Flutter app using `open -a test_dart_cli`
+8. Exits gracefully
 
 ## Flutter App UI
 
@@ -123,10 +132,10 @@ The daemon (`bin/daemon.dart`) accepts **3 arguments**:
 ## Process Management
 
 The `DaemonManager` provides:
-- `runDaemon()`: Launch detached daemon with 3 arguments
+- `runDaemon()`: Launch detached daemon with 4 arguments (parent PID, log path, app path, zip path)
 - `binaryPath`: Path to compiled daemon in app bundle
 - `logPath`: Project logs directory
-- `flutterAppPath`: Built Flutter app path
+- `flutterAppPath`: Installed app path (e.g., `/Applications/test_dart_cli.app`)
 - `zipFilePath`: Hardcoded update package path
 
 ## Testing the Update Flow
@@ -148,7 +157,12 @@ The `DaemonManager` provides:
 5. **Observe**:
    - App shows loading indicator
    - After 1 second, app closes
-   - Check `logs/daemon_log.txt` - should see 10 progress entries
+   - Check `logs/daemon_log.txt` - should see:
+     - Parent process monitoring
+     - Backup creation logs
+     - Update operations (when implemented)
+     - App relaunch
+   - Verify backup created at `/Applications/test_dart_cli.app.backup`
    - App automatically relaunches after daemon completes
 
 6. **Verify logs**:

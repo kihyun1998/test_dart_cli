@@ -50,26 +50,16 @@ void main(List<String> args) async {
     exit(0);
   });
 
-  // 1초 대기
-  await _writeLog(logFile, 'Waiting 1 second before relaunching app...');
-  await Future.delayed(Duration(seconds: 1));
+  // 앱 백업
+  final backupSuccess = await _backupCurrentApp(logFile, flutterAppPath);
+  if (!backupSuccess) {
+    await _launchApp(logFile, flutterAppPath);
+    await _writeLog(logFile, 'Daemon exiting due to backup failure...');
+    exit(1);
+  }
 
   // Flutter 앱 실행
-  await _writeLog(logFile, 'Launching Flutter app: $flutterAppPath');
-
-  try {
-    final process = await Process.start(
-      'open',
-      ['-a', 'test_dart_cli'],  // 앱 이름으로 실행
-      mode: ProcessStartMode.detached,
-    );
-    await _writeLog(
-      logFile,
-      'Flutter app launched successfully (PID: ${process.pid})',
-    );
-  } catch (e) {
-    await _writeLog(logFile, 'Failed to launch Flutter app: $e');
-  }
+  await _launchApp(logFile, flutterAppPath);
 
   await _writeLog(logFile, 'Daemon exiting...');
   exit(0);
@@ -92,5 +82,77 @@ Future<bool> _isProcessAlive(int pid) async {
     return result.exitCode == 0;
   } catch (e) {
     return false;
+  }
+}
+
+Future<bool> _backupCurrentApp(File logFile, String flutterAppPath) async {
+  try {
+    await _writeLog(logFile, 'Starting backup of current app...');
+
+    final appDir = Directory(flutterAppPath);
+
+    // 사용자 홈 디렉토리에 백업 저장
+    final homeDir = Platform.environment['HOME'];
+    if (homeDir == null) {
+      await _writeLog(logFile, 'Failed to get HOME directory');
+      return false;
+    }
+
+    final backupPath = '$homeDir/.test_dart_cli_backup/test_dart_cli.app.backup';
+    final backupDir = Directory(backupPath);
+
+    // 기존 백업 삭제
+    if (await backupDir.exists()) {
+      await _writeLog(logFile, 'Removing existing backup...');
+      await backupDir.delete(recursive: true);
+    }
+
+    // 앱 복사
+    await _writeLog(logFile, 'Copying app to backup location...');
+    await _copyDirectory(appDir, backupDir);
+
+    // 백업 검증
+    if (!await backupDir.exists()) {
+      await _writeLog(logFile, 'Backup verification failed: backup directory does not exist');
+      return false;
+    }
+
+    await _writeLog(logFile, 'Backup completed successfully: $backupPath');
+    return true;
+  } catch (e) {
+    await _writeLog(logFile, 'Backup failed: $e');
+    return false;
+  }
+}
+
+Future<void> _copyDirectory(Directory source, Directory destination) async {
+  await destination.create(recursive: true);
+
+  await for (final entity in source.list(recursive: false)) {
+    if (entity is Directory) {
+      final newDirectory = Directory('${destination.path}/${entity.path.split('/').last}');
+      await _copyDirectory(entity, newDirectory);
+    } else if (entity is File) {
+      final newFile = File('${destination.path}/${entity.path.split('/').last}');
+      await entity.copy(newFile.path);
+    }
+  }
+}
+
+Future<void> _launchApp(File logFile, String flutterAppPath) async {
+  await _writeLog(logFile, 'Launching Flutter app: $flutterAppPath');
+
+  try {
+    final process = await Process.start(
+      'open',
+      ['-a', 'test_dart_cli'],  // 앱 이름으로 실행
+      mode: ProcessStartMode.detached,
+    );
+    await _writeLog(
+      logFile,
+      'Flutter app launched successfully (PID: ${process.pid})',
+    );
+  } catch (e) {
+    await _writeLog(logFile, 'Failed to launch Flutter app: $e');
   }
 }

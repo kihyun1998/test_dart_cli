@@ -39,7 +39,16 @@ class DaemonManager {
   String get binSource => '$projectRoot/bin/daemon.dart';
   String get binaryPath => '$appBundleDir/daemon';  // 앱 번들 내부 경로
   String get logPath => '$projectRoot/logs/daemon_log.txt';
-  String get flutterAppPath => '$projectRoot/build/macos/Build/Products/Debug/test_dart_cli.app';
+
+  // 현재 실행 중인 앱의 .app 번들 경로 (자동 감지)
+  String get flutterAppPath {
+    return Directory(Platform.resolvedExecutable)
+        .parent  // MacOS
+        .parent  // Contents
+        .parent  // test_dart_cli.app
+        .path;
+  }
+
   String get zipFilePath => '$projectRoot/app_out/test_dart_cli_updater.zip';  // 다운로드 받은 zip 파일 경로 (하드코딩)
 
   /// 데몬 프로세스 실행
