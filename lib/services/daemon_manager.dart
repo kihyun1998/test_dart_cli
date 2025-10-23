@@ -40,6 +40,7 @@ class DaemonManager {
   String get binaryPath => '$appBundleDir/daemon';  // 앱 번들 내부 경로
   String get logPath => '$projectRoot/logs/daemon_log.txt';
   String get flutterAppPath => '$projectRoot/build/macos/Build/Products/Debug/test_dart_cli.app';
+  String get zipFilePath => '$projectRoot/app_out/test_dart_cli_updater.zip';  // 다운로드 받은 zip 파일 경로 (하드코딩)
 
   /// 데몬 프로세스 실행
   Future<RunResult> runDaemon() async {
@@ -76,10 +77,10 @@ class DaemonManager {
         logsDir.createSync(recursive: true);
       }
 
-      // detached 모드로 프로세스 시작 (로그 경로와 Flutter 앱 경로를 인자로 전달)
+      // detached 모드로 프로세스 시작 (로그 경로, Flutter 앱 경로, zip 파일 경로를 인자로 전달)
       final process = await Process.start(
         binaryPath,
-        [logPath, flutterAppPath], // 로그 파일 + Flutter 앱 경로 전달
+        [logPath, flutterAppPath, zipFilePath], // 로그 파일 + Flutter 앱 경로 + zip 파일 경로 전달
         mode: ProcessStartMode.detached,
         workingDirectory: projectRoot,
       );
