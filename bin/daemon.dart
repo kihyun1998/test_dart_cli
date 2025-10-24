@@ -1,15 +1,17 @@
 import 'dart:io';
 
-import 'utils/logger.dart';
-import 'utils/process_monitor.dart';
 import 'services/backup_service.dart';
 import 'services/installer_service.dart';
 import 'services/launcher_service.dart';
+import 'utils/logger.dart';
+import 'utils/process_monitor.dart';
 
 void main(List<String> args) async {
   // 인자: [부모 PID, 로그 파일 경로, Flutter 앱 경로, 압축 해제된 폴더 경로, 백업 경로]
   if (args.length < 5) {
-    stderr.writeln('Usage: daemon <parent_pid> <log_file_path> <flutter_app_path> <extracted_folder_path> <backup_path>');
+    stderr.writeln(
+      'Usage: daemon <parent_pid> <log_file_path> <flutter_app_path> <extracted_folder_path> <backup_path>',
+    );
     exit(1);
   }
 
@@ -75,7 +77,8 @@ Future<void> _runUpdateProcess(
     }
 
     // 2. 압축 해제된 앱 존재 확인
-    final tempAppPath = '$extractedFolderPath/test_dart_cli.app';
+    final appName = flutterAppPath.split('/').last.replaceAll('.app', '');
+    final tempAppPath = '$extractedFolderPath/$appName.app';
     final tempApp = Directory(tempAppPath);
     if (!await tempApp.exists()) {
       await logger.log('Extracted app not found: $tempAppPath');
@@ -100,7 +103,6 @@ Future<void> _runUpdateProcess(
     await logger.log('Update successful!');
     await cleanupTempDir(extractedFolderPath);
     await deleteBackup(backupPath);
-
   } catch (e) {
     await logger.log('Unexpected error during update: $e');
     await cleanupTempDir(extractedFolderPath);
