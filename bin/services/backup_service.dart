@@ -2,17 +2,8 @@ import 'dart:io';
 
 import '../utils/logger.dart';
 
-/// 백업 경로를 계산합니다.
-String getBackupPath() {
-  final homeDir = Platform.environment['HOME'];
-  if (homeDir == null) {
-    throw Exception('Failed to get HOME directory');
-  }
-  return '$homeDir/.test_dart_cli_backup/test_dart_cli.app.backup';
-}
-
 /// 현재 앱을 백업 위치로 이동합니다 (rename 사용).
-Future<bool> moveAppToBackup(String flutterAppPath) async {
+Future<bool> moveAppToBackup(String flutterAppPath, String backupPath) async {
   final logger = Logger.instance;
   try {
     await logger.log('Starting backup (rename) of current app...');
@@ -23,7 +14,6 @@ Future<bool> moveAppToBackup(String flutterAppPath) async {
       return false;
     }
 
-    final backupPath = getBackupPath();
     final backupDir = Directory(backupPath);
 
     // 기존 백업 삭제
@@ -57,12 +47,11 @@ Future<bool> moveAppToBackup(String flutterAppPath) async {
 }
 
 /// 백업에서 앱을 복원합니다 (rollback).
-Future<bool> rollbackFromBackup(String flutterAppPath) async {
+Future<bool> rollbackFromBackup(String flutterAppPath, String backupPath) async {
   final logger = Logger.instance;
   try {
     await logger.log('Rolling back from backup...');
 
-    final backupPath = getBackupPath();
     final backupDir = Directory(backupPath);
 
     if (!await backupDir.exists()) {
@@ -96,12 +85,11 @@ Future<bool> rollbackFromBackup(String flutterAppPath) async {
 }
 
 /// 백업을 삭제합니다 (성공 시 정리용).
-Future<void> deleteBackup() async {
+Future<void> deleteBackup(String backupPath) async {
   final logger = Logger.instance;
   try {
     await logger.log('Deleting backup...');
 
-    final backupPath = getBackupPath();
     final backupDir = Directory(backupPath);
 
     if (await backupDir.exists()) {
