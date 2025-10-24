@@ -8,12 +8,13 @@ This is a **macOS Zip Updater Test App** - a Flutter + Dart CLI experiment demon
 
 **Core Goal**: Simulate macOS app auto-update flow where:
 1. User clicks "Update" button in Flutter app
-2. Daemon process starts in background (detached)
-3. Flutter app immediately exits
-4. Daemon waits for parent process to exit
-5. Daemon backs up current app to `.backup`
-6. Daemon performs update operations (zip extraction, file replacement)
-7. Daemon relaunches the Flutter app
+2. Flutter app extracts zip file to temporary directory
+3. Daemon process starts in background (detached)
+4. Flutter app immediately exits
+5. Daemon waits for parent process to exit
+6. Daemon backs up current app to `.backup`
+7. Daemon performs update operations (file replacement from extracted folder)
+8. Daemon relaunches the Flutter app
 
 **Architecture**: Two separate processes
 - **Flutter macOS App** (`lib/`): Simple UI with version display and update button
@@ -48,7 +49,7 @@ The daemon survives Flutter app termination because `DaemonManager.runDaemon()` 
 ```dart
 Process.start(
   binaryPath,
-  [parentPid, logPath, flutterAppPath, zipFilePath],  // 4 arguments
+  [parentPid, logPath, flutterAppPath, extractedFolderPath],  // 4 arguments
   mode: ProcessStartMode.detached,  // Key: parent death doesn't kill child
   workingDirectory: projectRoot,
 );
@@ -85,14 +86,17 @@ bin_output/daemon                        # Compiled daemon binary (gitignored)
 app_out/test_dart_cli_updater.zip       # Downloaded update package (simulated)
 logs/daemon_log.txt                      # Update process logs (gitignored)
 lib/services/daemon_manager.dart         # Process management and hardcoded paths
+lib/services/extractor_service.dart      # Zip extraction logic (runs in Flutter app)
 lib/screens/home_screen.dart             # Simple UI: version display + update button
+~/.test_dart_cli_temp/                   # Temporary extraction directory (cleaned up after update)
+~/.test_dart_cli_backup/                 # Backup directory (deleted after successful update)
 ```
 
 ## Daemon Behavior
 
 The daemon (`bin/daemon.dart`) accepts **4 arguments**:
 ```bash
-./daemon <parent_pid> <log_file_path> <flutter_app_path> <zip_file_path>
+./daemon <parent_pid> <log_file_path> <flutter_app_path> <extracted_folder_path>
 ```
 
 **Update Flow**:
@@ -100,7 +104,7 @@ The daemon (`bin/daemon.dart`) accepts **4 arguments**:
    - Parent PID: Process ID of the Flutter app to monitor
    - Log file path: `/Users/kihyun/Documents/GitHub/test_dart_cli/logs/daemon_log.txt`
    - Flutter app path: `/Applications/test_dart_cli.app` (actual installed app location)
-   - Zip file path: `/Users/kihyun/Documents/GitHub/test_dart_cli/app_out/test_dart_cli_updater.zip` (hardcoded)
+   - Extracted folder path: `~/.test_dart_cli_temp/` (fixed temporary directory created by Flutter app)
 
 2. Logs startup info and received paths
 3. Monitors parent process until it exits (1 second intervals)
@@ -110,12 +114,9 @@ The daemon (`bin/daemon.dart`) accepts **4 arguments**:
    - Renames entire `.app` bundle from `/Applications` to backup location
    - Verifies backup exists
    - If backup fails: relaunches app and exits with error
-6. **Extracts update package**:
-   - Creates temporary directory with `Directory.systemTemp.createTemp()`
-   - Extracts zip using `archive` package
-   - **Restores Unix file permissions** from zip metadata (critical for executables)
-   - Verifies `test_dart_cli.app` exists in extracted files
-   - If extraction fails: rolls back from backup, relaunches app, exits
+6. **Verifies extracted app**:
+   - Checks `test_dart_cli.app` exists in extracted folder path
+   - If verification fails: rolls back from backup, relaunches app, exits
 7. **Installs new app** using rename:
    - Renames extracted app from temp directory to `/Applications/test_dart_cli.app`
    - Verifies installation
@@ -128,7 +129,7 @@ The daemon (`bin/daemon.dart`) accepts **4 arguments**:
 
 **Key Implementation Details**:
 - Uses `rename()` instead of recursive copy for speed and atomicity
-- Preserves Unix file permissions during zip extraction (fixes "can't be opened" errors)
+- Zip extraction is performed by Flutter app (not daemon) using `archive` package with Unix permission restoration
 - Comprehensive rollback mechanism on any failure
 - All errors logged to `daemon_log.txt`
 
@@ -140,21 +141,29 @@ The daemon (`bin/daemon.dart`) accepts **4 arguments**:
 - **Update Log Card**: Shows status messages during update
 
 **Update Process** (triggered by button click):
-1. Calls `DaemonManager.runDaemon()`
-2. Shows "업데이트 프로세스 시작 중..." message
-3. Waits 1 second
-4. App exits (`exit(0)`)
-5. Daemon continues in background
-6. Daemon relaunches app after 10 log entries
+1. Shows "Zip 파일 압축 해제 중..." message
+2. Calls `extractZipToTemp()` to extract update package
+   - Removes existing temp directory if present (`~/.test_dart_cli_temp/`)
+   - Creates fresh temp directory
+   - Extracts zip to `~/.test_dart_cli_temp/`
+   - Restores Unix file permissions using `chmod`
+   - Verifies extracted app exists
+   - If extraction fails: shows error and stops
+3. Shows "업데이트 프로세스 시작 중..." message
+4. Calls `DaemonManager.runDaemon(extractedFolderPath)`
+5. Waits 1 second
+6. App exits (`exit(0)`)
+7. Daemon continues in background
+8. Daemon relaunches app after completing update
 
 ## Process Management
 
 The `DaemonManager` provides:
-- `runDaemon()`: Launch detached daemon with 4 arguments (parent PID, log path, app path, zip path)
+- `runDaemon(extractedFolderPath)`: Launch detached daemon with 4 arguments (parent PID, log path, app path, extracted folder path)
 - `binaryPath`: Path to compiled daemon in app bundle
 - `logPath`: Project logs directory
 - `flutterAppPath`: Installed app path (e.g., `/Applications/test_dart_cli.app`)
-- `zipFilePath`: Hardcoded update package path
+- `zipFilePath`: Hardcoded update package path (used by Flutter app for extraction)
 
 ## Testing the Update Flow
 
@@ -173,12 +182,14 @@ The `DaemonManager` provides:
 4. **Click "업데이트 시작" button**
 
 5. **Observe**:
-   - App shows loading indicator
+   - App shows "Zip 파일 압축 해제 중..." message
+   - Zip extraction happens in Flutter app (watch console for extraction logs)
+   - App shows "업데이트 프로세스 시작 중..." message
    - After 1 second, app closes
    - Check `logs/daemon_log.txt` - should see:
      - Parent process monitoring
      - Backup creation logs (rename to `~/.test_dart_cli_backup/`)
-     - Zip extraction with permission restoration
+     - Extracted app verification
      - New app installation
      - Temp cleanup and backup deletion
      - App relaunch

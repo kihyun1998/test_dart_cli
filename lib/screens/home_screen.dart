@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../services/daemon_manager.dart';
+import '../services/extractor_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,7 +16,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final DaemonManager _manager = DaemonManager();
 
   // 하드코딩된 버전 정보
-  static const String appVersion = '2.0.2';
+  static const String appVersion = '3.0.0';
   static const String buildNumber = '1';
 
   String _statusMessage = '업데이트 대기 중...';
@@ -27,12 +28,35 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _startUpdate() async {
+    // 1단계: Zip 압축 해제
     setState(() {
       _isLoading = true;
-      _statusMessage = '업데이트 프로세스 시작 중...';
+      _statusMessage = 'Zip 파일 압축 해제 중...\n경로: ${_manager.zipFilePath}';
     });
 
-    final result = await _manager.runDaemon();
+    print('===== Zip 압축 해제 시작 =====');
+    print('Zip 파일 경로: ${_manager.zipFilePath}');
+
+    final extractResult = await extractZipToTemp(_manager.zipFilePath);
+
+    if (!extractResult.success) {
+      setState(() {
+        _isLoading = false;
+        _statusMessage = '❌ 압축 해제 실패\n\n${extractResult.message}';
+      });
+      print('압축 해제 실패: ${extractResult.message}');
+      return;
+    }
+
+    print('압축 해제 성공: ${extractResult.extractedPath}');
+    print('==============================');
+
+    // 2단계: Daemon 프로세스 시작
+    setState(() {
+      _statusMessage = '업데이트 프로세스 시작 중...\n압축 해제 완료: ${extractResult.message}';
+    });
+
+    final result = await _manager.runDaemon(extractResult.extractedPath!);
 
     // 콘솔에 로그 출력
     print('===== 업데이트 프로세스 시작 =====');
@@ -40,6 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
     print('바이너리 경로: ${_manager.binaryPath}');
     print('로그 파일 경로: ${_manager.logPath}');
     print('Flutter 앱 경로: ${_manager.flutterAppPath}');
+    print('압축 해제된 폴더: ${extractResult.extractedPath}');
     print('=================================');
 
     setState(() {

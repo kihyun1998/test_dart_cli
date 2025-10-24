@@ -52,7 +52,7 @@ class DaemonManager {
   String get zipFilePath => '$projectRoot/app_out/test_dart_cli_updater.zip';  // 다운로드 받은 zip 파일 경로 (하드코딩)
 
   /// 데몬 프로세스 실행
-  Future<RunResult> runDaemon() async {
+  Future<RunResult> runDaemon(String extractedFolderPath) async {
     try {
       // 바이너리 파일 존재 확인
       final binary = File(binaryPath);
@@ -89,10 +89,10 @@ class DaemonManager {
       // 현재 프로세스 PID 가져오기
       final currentPid = pid;
 
-      // detached 모드로 프로세스 시작 (부모 PID, 로그 경로, Flutter 앱 경로, zip 파일 경로를 인자로 전달)
+      // detached 모드로 프로세스 시작 (부모 PID, 로그 경로, Flutter 앱 경로, 압축 해제된 폴더 경로를 인자로 전달)
       final process = await Process.start(
         binaryPath,
-        ['$currentPid', logPath, flutterAppPath, zipFilePath], // 부모 PID + 로그 파일 + Flutter 앱 경로 + zip 파일 경로 전달
+        ['$currentPid', logPath, flutterAppPath, extractedFolderPath], // 부모 PID + 로그 파일 + Flutter 앱 경로 + 압축 해제된 폴더 경로 전달
         mode: ProcessStartMode.detached,
         workingDirectory: projectRoot,
       );
