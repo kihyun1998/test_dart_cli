@@ -16,7 +16,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final DaemonManager _manager = DaemonManager();
 
   // 하드코딩된 버전 정보
-  static const String appVersion = '5.0.1';
+  static const String appVersion = '5.0.3';
   static const String buildNumber = '1';
 
   String _statusMessage = '업데이트 대기 중...';
