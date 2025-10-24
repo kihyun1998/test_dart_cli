@@ -3,15 +3,16 @@ import 'dart:io';
 import '../utils/logger.dart';
 
 /// 임시 디렉토리의 앱을 타겟 위치로 설치합니다 (rename 사용).
-Future<bool> installNewApp(File logFile, String tempAppPath, String targetPath) async {
+Future<bool> installNewApp(String tempAppPath, String targetPath) async {
+  final logger = Logger.instance;
   try {
-    await writeLog(logFile, 'Installing new app...');
-    await writeLog(logFile, 'From: $tempAppPath');
-    await writeLog(logFile, 'To: $targetPath');
+    await logger.log('Installing new app...');
+    await logger.log('From: $tempAppPath');
+    await logger.log('To: $targetPath');
 
     final tempApp = Directory(tempAppPath);
     if (!await tempApp.exists()) {
-      await writeLog(logFile, 'Temp app does not exist: $tempAppPath');
+      await logger.log('Temp app does not exist: $tempAppPath');
       return false;
     }
 
@@ -21,14 +22,14 @@ Future<bool> installNewApp(File logFile, String tempAppPath, String targetPath) 
     // 설치 검증
     final installedApp = Directory(targetPath);
     if (!await installedApp.exists()) {
-      await writeLog(logFile, 'Installation verification failed: app not found at $targetPath');
+      await logger.log('Installation verification failed: app not found at $targetPath');
       return false;
     }
 
-    await writeLog(logFile, 'New app installed successfully');
+    await logger.log('New app installed successfully');
     return true;
   } catch (e) {
-    await writeLog(logFile, 'Installation failed: $e');
+    await logger.log('Installation failed: $e');
     return false;
   }
 }

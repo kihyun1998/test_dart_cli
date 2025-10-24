@@ -14,26 +14,28 @@ Future<bool> isProcessAlive(int pid) async {
 }
 
 /// 부모 프로세스가 종료될 때까지 모니터링합니다.
-Future<void> monitorParentProcess(File logFile, int parentPid) async {
-  await writeLog(logFile, 'Starting parent process monitoring...');
+Future<void> monitorParentProcess(int parentPid) async {
+  final logger = Logger.instance;
+  await logger.log('Starting parent process monitoring...');
   int checkCount = 0;
   while (await isProcessAlive(parentPid)) {
     checkCount++;
-    await writeLog(logFile, 'Parent process check #$checkCount: still alive');
+    await logger.log('Parent process check #$checkCount: still alive');
     await Future.delayed(Duration(seconds: 1));
   }
-  await writeLog(logFile, 'Parent process exit detected!');
+  await logger.log('Parent process exit detected!');
 }
 
 /// SIGTERM/SIGINT 시그널 핸들러를 설정합니다.
-void setupSignalHandlers(File logFile) {
+void setupSignalHandlers() {
+  final logger = Logger.instance;
   ProcessSignal.sigterm.watch().listen((signal) async {
-    await writeLog(logFile, 'Daemon received SIGTERM, shutting down...');
+    await logger.log('Daemon received SIGTERM, shutting down...');
     exit(0);
   });
 
   ProcessSignal.sigint.watch().listen((signal) async {
-    await writeLog(logFile, 'Daemon received SIGINT, shutting down...');
+    await logger.log('Daemon received SIGINT, shutting down...');
     exit(0);
   });
 }

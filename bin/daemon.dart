@@ -18,58 +18,56 @@ void main(List<String> args) async {
   final flutterAppPath = args[2];
   final extractedFolderPath = args[3];
 
-  final logFile = File(logFilePath);
-
-  // 로그 디렉토리 생성
-  final logDir = logFile.parent;
-  if (!logDir.existsSync()) {
-    logDir.createSync(recursive: true);
-  }
+  // Logger 초기화
+  final logger = Logger.instance;
+  logger.initialize(logFilePath);
 
   final currentPid = pid;
 
   // 시작 로그 기록
-  await writeLog(logFile, 'Daemon started (PID: $currentPid)');
-  await writeLog(logFile, 'Parent PID: $parentPid');
-  await writeLog(logFile, 'Flutter app path: $flutterAppPath');
-  await writeLog(logFile, 'Extracted folder path: $extractedFolderPath');
+  await logger.log('Daemon started (PID: $currentPid)');
+  await logger.log('Parent PID: $parentPid');
+  await logger.log('Flutter app path: $flutterAppPath');
+  await logger.log('Extracted folder path: $extractedFolderPath');
 
   // 부모 프로세스 모니터링
-  await monitorParentProcess(logFile, parentPid);
+  await monitorParentProcess(parentPid);
 
   // SIGTERM/SIGINT 핸들러 설정
-  setupSignalHandlers(logFile);
+  setupSignalHandlers();
 
   // 업데이트 프로세스 실행
-  await _runUpdateProcess(logFile, flutterAppPath, extractedFolderPath);
+  await _runUpdateProcess(flutterAppPath, extractedFolderPath);
 }
 
 /// 임시 디렉토리를 삭제합니다.
-Future<void> cleanupTempDir(File logFile, String tempDir) async {
+Future<void> cleanupTempDir(String tempDir) async {
+  final logger = Logger.instance;
   try {
-    await writeLog(logFile, 'Cleaning up temp directory: $tempDir');
+    await logger.log('Cleaning up temp directory: $tempDir');
     final dir = Directory(tempDir);
     if (await dir.exists()) {
       await dir.delete(recursive: true);
-      await writeLog(logFile, 'Temp directory deleted');
+      await logger.log('Temp directory deleted');
     }
   } catch (e) {
-    await writeLog(logFile, 'Failed to cleanup temp directory (non-critical): $e');
+    await logger.log('Failed to cleanup temp directory (non-critical): $e');
   }
 }
 
 /// 업데이트 프로세스를 실행합니다.
 Future<void> _runUpdateProcess(
-  File logFile,
   String flutterAppPath,
   String extractedFolderPath,
 ) async {
+  final logger = Logger.instance;
+
   try {
     // 1. 백업 (rename)
-    final backupSuccess = await moveAppToBackup(logFile, flutterAppPath);
+    final backupSuccess = await moveAppToBackup(flutterAppPath);
     if (!backupSuccess) {
-      await launchApp(logFile, flutterAppPath);
-      await writeLog(logFile, 'Daemon exiting due to backup failure...');
+      await launchApp(flutterAppPath);
+      await logger.log('Daemon exiting due to backup failure...');
       exit(1);
     }
 
@@ -77,39 +75,39 @@ Future<void> _runUpdateProcess(
     final tempAppPath = '$extractedFolderPath/test_dart_cli.app';
     final tempApp = Directory(tempAppPath);
     if (!await tempApp.exists()) {
-      await writeLog(logFile, 'Extracted app not found: $tempAppPath');
-      await cleanupTempDir(logFile, extractedFolderPath);
-      await rollbackFromBackup(logFile, flutterAppPath);
-      await launchApp(logFile, flutterAppPath);
+      await logger.log('Extracted app not found: $tempAppPath');
+      await cleanupTempDir(extractedFolderPath);
+      await rollbackFromBackup(flutterAppPath);
+      await launchApp(flutterAppPath);
       exit(1);
     }
-    await writeLog(logFile, 'Extracted app verified: $tempAppPath');
+    await logger.log('Extracted app verified: $tempAppPath');
 
     // 3. 새 앱 설치 (rename)
-    final installSuccess = await installNewApp(logFile, tempAppPath, flutterAppPath);
+    final installSuccess = await installNewApp(tempAppPath, flutterAppPath);
     if (!installSuccess) {
-      await writeLog(logFile, 'Failed to install new app, rolling back...');
-      await cleanupTempDir(logFile, extractedFolderPath);
-      await rollbackFromBackup(logFile, flutterAppPath);
-      await launchApp(logFile, flutterAppPath);
+      await logger.log('Failed to install new app, rolling back...');
+      await cleanupTempDir(extractedFolderPath);
+      await rollbackFromBackup(flutterAppPath);
+      await launchApp(flutterAppPath);
       exit(1);
     }
 
     // 4. 성공 - 정리
-    await writeLog(logFile, 'Update successful!');
-    await cleanupTempDir(logFile, extractedFolderPath);
-    await deleteBackup(logFile);
+    await logger.log('Update successful!');
+    await cleanupTempDir(extractedFolderPath);
+    await deleteBackup();
 
   } catch (e) {
-    await writeLog(logFile, 'Unexpected error during update: $e');
-    await cleanupTempDir(logFile, extractedFolderPath);
-    await rollbackFromBackup(logFile, flutterAppPath);
-    await launchApp(logFile, flutterAppPath);
+    await logger.log('Unexpected error during update: $e');
+    await cleanupTempDir(extractedFolderPath);
+    await rollbackFromBackup(flutterAppPath);
+    await launchApp(flutterAppPath);
     exit(1);
   }
 
   // 5. 앱 재실행
-  await launchApp(logFile, flutterAppPath);
-  await writeLog(logFile, 'Daemon exiting...');
+  await launchApp(flutterAppPath);
+  await logger.log('Daemon exiting...');
   exit(0);
 }

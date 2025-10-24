@@ -12,13 +12,14 @@ String getBackupPath() {
 }
 
 /// 현재 앱을 백업 위치로 이동합니다 (rename 사용).
-Future<bool> moveAppToBackup(File logFile, String flutterAppPath) async {
+Future<bool> moveAppToBackup(String flutterAppPath) async {
+  final logger = Logger.instance;
   try {
-    await writeLog(logFile, 'Starting backup (rename) of current app...');
+    await logger.log('Starting backup (rename) of current app...');
 
     final appDir = Directory(flutterAppPath);
     if (!await appDir.exists()) {
-      await writeLog(logFile, 'App does not exist at: $flutterAppPath');
+      await logger.log('App does not exist at: $flutterAppPath');
       return false;
     }
 
@@ -27,7 +28,7 @@ Future<bool> moveAppToBackup(File logFile, String flutterAppPath) async {
 
     // 기존 백업 삭제
     if (await backupDir.exists()) {
-      await writeLog(logFile, 'Removing existing backup...');
+      await logger.log('Removing existing backup...');
       await backupDir.delete(recursive: true);
     }
 
@@ -38,40 +39,41 @@ Future<bool> moveAppToBackup(File logFile, String flutterAppPath) async {
     }
 
     // 앱을 백업 위치로 rename
-    await writeLog(logFile, 'Moving app to backup location...');
+    await logger.log('Moving app to backup location...');
     await appDir.rename(backupPath);
 
     // 백업 검증
     if (!await backupDir.exists()) {
-      await writeLog(logFile, 'Backup verification failed: backup directory does not exist');
+      await logger.log('Backup verification failed: backup directory does not exist');
       return false;
     }
 
-    await writeLog(logFile, 'Backup completed successfully (renamed): $backupPath');
+    await logger.log('Backup completed successfully (renamed): $backupPath');
     return true;
   } catch (e) {
-    await writeLog(logFile, 'Backup failed: $e');
+    await logger.log('Backup failed: $e');
     return false;
   }
 }
 
 /// 백업에서 앱을 복원합니다 (rollback).
-Future<bool> rollbackFromBackup(File logFile, String flutterAppPath) async {
+Future<bool> rollbackFromBackup(String flutterAppPath) async {
+  final logger = Logger.instance;
   try {
-    await writeLog(logFile, 'Rolling back from backup...');
+    await logger.log('Rolling back from backup...');
 
     final backupPath = getBackupPath();
     final backupDir = Directory(backupPath);
 
     if (!await backupDir.exists()) {
-      await writeLog(logFile, 'Backup does not exist: $backupPath');
+      await logger.log('Backup does not exist: $backupPath');
       return false;
     }
 
     // 실패한 앱이 있다면 삭제
     final failedApp = Directory(flutterAppPath);
     if (await failedApp.exists()) {
-      await writeLog(logFile, 'Removing failed app...');
+      await logger.log('Removing failed app...');
       await failedApp.delete(recursive: true);
     }
 
@@ -81,33 +83,34 @@ Future<bool> rollbackFromBackup(File logFile, String flutterAppPath) async {
     // 롤백 검증
     final restoredApp = Directory(flutterAppPath);
     if (!await restoredApp.exists()) {
-      await writeLog(logFile, 'Rollback verification failed: app not found at $flutterAppPath');
+      await logger.log('Rollback verification failed: app not found at $flutterAppPath');
       return false;
     }
 
-    await writeLog(logFile, 'Rollback completed successfully');
+    await logger.log('Rollback completed successfully');
     return true;
   } catch (e) {
-    await writeLog(logFile, 'Rollback failed: $e');
+    await logger.log('Rollback failed: $e');
     return false;
   }
 }
 
 /// 백업을 삭제합니다 (성공 시 정리용).
-Future<void> deleteBackup(File logFile) async {
+Future<void> deleteBackup() async {
+  final logger = Logger.instance;
   try {
-    await writeLog(logFile, 'Deleting backup...');
+    await logger.log('Deleting backup...');
 
     final backupPath = getBackupPath();
     final backupDir = Directory(backupPath);
 
     if (await backupDir.exists()) {
       await backupDir.delete(recursive: true);
-      await writeLog(logFile, 'Backup deleted successfully');
+      await logger.log('Backup deleted successfully');
     } else {
-      await writeLog(logFile, 'No backup to delete');
+      await logger.log('No backup to delete');
     }
   } catch (e) {
-    await writeLog(logFile, 'Failed to delete backup (non-critical): $e');
+    await logger.log('Failed to delete backup (non-critical): $e');
   }
 }
